@@ -1,65 +1,51 @@
 
 (() => {
-  // Prevent duplicate listeners if the script is loaded again.
   if (window.__personalAutofillLoaded) return;
   window.__personalAutofillLoaded = true;
 
-  console.log("Personal Details Autofill loaded:", location.href);
-
-  function getFieldLabel(field) {
-    const labels = Array.from(field.labels || []).map(label => label.innerText).join(" ");
-    return [field.name, field.id, field.placeholder, field.autocomplete, field.getAttribute("aria-label"), field.title, labels].filter(Boolean).join(" ").toLowerCase();
+  // Find the text that identifies a form field.
+  function getLabel(field) {
+    return `${field.name} ${field.id} ${field.placeholder} ${field.getAttribute("aria-label")}`.toLowerCase();
   }
 
+  // Check whether a field can be filled.
   function isVisible(field) {
     return field.getClientRects().length > 0 && !field.disabled && !field.readOnly && field.type !== "hidden";
   }
 
-  // Detect relevant form fields and show the floating panel.
+  // Detect personal-detail fields.
   function detectForm() {
     if (document.getElementById("personal-autofill-panel") || window.__autofillPanelDismissed) return;
 
     const fields = [...document.querySelectorAll("input, textarea, select")].filter(isVisible);
-    const keywords = ["name", "address", "birth", "dob", "phone", "mobile", "contact", "location"];
-    const found = fields.some(field => {
-      const label = getFieldLabel(field);
-      return !label.includes("company") && keywords.some(word => label.includes(word));
-    });
+    const found = fields.some(field => /name|address|birth|dob|phone|mobile|contact/.test(getLabel(field)) && !getLabel(field).includes("company"));
 
-    if (found) showAutofillPanel();
+    if (found) showPanel();
   }
 
-  // Build the floating panel inside the webpage.
-  function showAutofillPanel() {
+  // Create the floating popup.
+  function showPanel() {
     const panel = document.createElement("div");
     panel.id = "personal-autofill-panel";
-
-    Object.assign(panel.style, {
-      position: "fixed", right: "20px", bottom: "20px", zIndex: "2147483647",
-      background: "#fff", color: "#222", padding: "16px", width: "250px",
-      border: "1px solid #ccc", borderRadius: "8px",
-      boxShadow: "0 2px 12px #999", font: "14px Arial"
-    });
+    panel.style.cssText = "position:fixed;right:20px;bottom:20px;z-index:999999;background:white;color:black;padding:15px;border:1px solid #ccc;border-radius:8px;width:250px;box-shadow:0 2px 10px #aaa;font:14px Arial";
 
     panel.innerHTML = `<b>Personal Details Autofill</b>
-      <button id="autofill-close" style="float:right">×</button>
-      <br><br><select id="autofill-profile" style="width:100%">
-      <option value="">Select a profile</option></select>
-      <br><br><button id="autofill-fill" disabled>Autofill</button>
-      <p id="autofill-status"></p>`;
+      <button id="close">×</button><br><br>
+      <select id="profile" style="width:100%"><option value="">Select a profile</option></select>
+      <br><br><button id="fill" disabled>Autofill</button><p id="status"></p>`;
 
     document.body.appendChild(panel);
 
-    const select = panel.querySelector("#autofill-profile");
-    const button = panel.querySelector("#autofill-fill");
-    const status = panel.querySelector("#autofill-status");
+    const select = panel.querySelector("#profile");
+    const button = panel.querySelector("#fill");
+    const status = panel.querySelector("#status");
 
-    panel.querySelector("#autofill-close").onclick = () => {
+    panel.querySelector("#close").onclick = () => {
       window.__autofillPanelDismissed = true;
       panel.remove();
     };
 
-    // Request profile data from background.js.
+    // Get profiles from background.js.
     chrome.runtime.sendMessage({ action: "GET_PROFILES" }, response => {
       if (chrome.runtime.lastError || !response?.success) {
         status.textContent = response?.error || "Could not load profiles.";
@@ -67,111 +53,69 @@
       }
 
       response.profiles.forEach((person, index) => {
-        const option = document.createElement("option");
-        option.value = index;
-        option.textContent = `${person.firstName} ${person.lastName}`.trim();
-        select.appendChild(option);
+        select.add(new Option(`${person.firstName} ${person.lastName}`, index));
       });
 
       select.onchange = () => button.disabled = select.value === "";
       button.onclick = () => {
-        const result = autofillProfile(response.profiles[Number(select.value)]);
+        const result = autofill(response.profiles[Number(select.value)]);
         status.textContent = `${result.filled} fields filled; ${result.skipped} skipped.`;
       };
     });
   }
 
-  // Set a field's value and notify the website.
-  function fillField(field, value) {
-    if (!value || !isVisible(field) || field.value.trim() !== "") return false;
-
-    if (field.tagName === "SELECT") {
-      const option = [...field.options].find(option =>
-        option.value.toLowerCase() === value.toLowerCase() ||
-        option.text.trim().toLowerCase() === value.toLowerCase()
-      );
-      if (!option) return false;
-      field.value = option.value;
-    } else {
-      // Use the native setter to support many React-controlled fields.
-      let prototype = Object.getPrototypeOf(field);
-      let descriptor;
-
-      while (prototype && !descriptor) {
-        descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
-        prototype = Object.getPrototypeOf(prototype);
-      }
-
-      if (descriptor?.set) descriptor.set.call(field, value);
-      else field.value = value;
-    }
-
-    field.dispatchEvent(new Event("input", { bubbles: true }));
-    field.dispatchEvent(new Event("change", { bubbles: true }));
-    return true;
-  }
-
-  function autofillProfile(person) {
+  // Fill matching empty fields.
+  function autofill(person) {
     const fields = [...document.querySelectorAll("input, textarea, select")].filter(isVisible);
     const used = new Set();
     let filled = 0, skipped = 0;
 
-    function matchField(keywords, value) {
-      const field = fields.find(field => {
-        const label = getFieldLabel(field);
-        return !used.has(field) && !label.includes("company") && keywords.some(word => label.includes(word));
-      });
+    function fillField(keywords, value) {
+      const field = fields.find(field => !used.has(field) && !getLabel(field).includes("company") && keywords.some(word => getLabel(field).includes(word)));
 
-      if (!field || !fillField(field, value)) skipped++;
-      else {
-        used.add(field);
-        filled++;
+      if (!field || !value || field.value.trim() !== "") {
+        skipped++;
+        return;
       }
+
+      field.value = value;
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      field.dispatchEvent(new Event("change", { bubbles: true }));
+      used.add(field);
+      filled++;
     }
 
-    // Match a full-name field before separate first and last names.
-    const fullName = fields.find(field => /full.?name|your.?name/.test(getFieldLabel(field)) && !getFieldLabel(field).includes("company"));
-    if (fullName) {
-      if (fillField(fullName, `${person.firstName} ${person.lastName}`.trim())) {
-        used.add(fullName);
-        filled++;
-      }
-    }
-
-    matchField(["first name", "firstname", "given-name"], person.firstName);
-    matchField(["last name", "lastname", "family-name", "surname"], person.lastName);
-
-    // Support forms with separate address lines.
+    fillField(["first name", "firstname"], person.firstName);
+    fillField(["last name", "lastname", "surname"], person.lastName);
+    fillField(["full name"], `${person.firstName} ${person.lastName}`);
     const addressParts = (person.address || "").split(",");
-    const address1 = addressParts[0]?.trim() || "";
-    const address2 = addressParts.slice(1).join(",").trim();
-    const hasAddress1 = fields.some(field => /address[- ]?line[- ]?1|addressline1|address1/.test(getFieldLabel(field)));
+const address1 = addressParts[0]?.trim() || "";
+const address2 = addressParts.slice(1).join(",").trim();
 
-    if (hasAddress1) {
-      matchField(["address line 1", "addressline1", "address1"], address1);
-      if (address2) matchField(["address line 2", "addressline2", "address2"], address2);
-    } else {
-      matchField(["street address", "street-address", "address"], person.address);
-    }
+const hasAddress1 = fields.some(field =>
+  /address.?line.?1|addressline1|address1/.test(getLabel(field))
+);
 
-    matchField(["date of birth", "dateofbirth", "birth date", "dob", "bday"], person.dob);
-    matchField(["phone", "mobile", "telephone", "tel", "contact number"], person.phone);
+if (hasAddress1) {
+  fillField(["address line 1", "addressline1", "address1"], address1);
+  if (address2) fillField(["address line 2", "addressline2", "address2"], address2);
+} else {
+  fillField(["address"], person.address);
+}
+    fillField(["date of birth", "birth date", "dob"], person.dob);
+    fillField(["phone", "mobile", "contact"], person.phone);
 
     return { filled, skipped };
   }
 
-  // Support Autofill from the original extension popup.
+  // Support autofill from the original toolbar popup.
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === "AUTOFILL_PROFILE") {
-      try {
-        sendResponse({ success: true, ...autofillProfile(message.person) });
-      } catch (error) {
-        sendResponse({ success: false, error: error.message });
-      }
+      sendResponse({ success: true, ...autofill(message.person) });
     }
   });
 
-  // Detect forms added after the page initially loads.
+  // Check for forms when the page changes.
   new MutationObserver(detectForm).observe(document.documentElement, {
     childList: true, subtree: true
   });
