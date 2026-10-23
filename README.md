@@ -65,7 +65,6 @@ This Chrome extension automatically detects relevant form fields on webpages and
 4. Copy the published CSV URL into the `SHEET_URL` constant in `background.js`. If the original popup fetches the Sheet directly, configure its URL in `popup.js` as well.
 5. Reload the extension and refresh the profile data.
 
-**Important:** Published Sheet data may be accessible to anyone with the published link. Use dummy data for testing.
 
 ## 7. How to Use
 
