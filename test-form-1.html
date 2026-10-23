@@ -1,0 +1,29 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Autofill Test Form 1</title>
+</head>
+<body>
+  <h2>Personal Details Form</h2>
+
+  <form>
+    <label>First Name: <input type="text" name="firstName" autocomplete="given-name"></label><br><br>
+    <label>Last Name: <input type="text" name="lastName" autocomplete="family-name"></label><br><br>
+    
+    <label>Address Line 1: <input type="text" name="addressLine1" autocomplete="address-line1"></label><br><br>
+    <label>Address Line 2: <input type="text" name="addressLine2" autocomplete="address-line2"></label><br><br>
+
+    <label>Date of Birth: <input type="date" name="dob"></label><br><br>
+    
+    <label>Contact Number: <input type="tel" name="phone" autocomplete="tel"></label><br><br>
+    <input type="hidden" name="firstName" value="HiddenValue">
+    <label>Read-only Name: <input type="text" name="readonlyName" value="KeepThis" readonly></label><br><br>
+    <label>Disabled Phone: <input type="tel" name="disabledPhone" value="12345" disabled></label><br><br>
+
+    <label>Company Name: <input type="text" name="companyName"></label><br><br>
+    <button type="button" onclick="alert('Test form submitted!')">Submit</button>
+  </form>
+</body>
+</html>

@@ -1,0 +1,34 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Sheets Autofill</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h2>Personal Details Autofill</h2>
+
+  <p id="status">Click Refresh Data to load profiles.</p>
+
+  <button id="refreshBtn">Refresh Data</button>
+  <label for="profileSelect">Select Person</label>
+  <select id="profileSelect">
+    <option value="">Select a person</option>
+  </select>
+
+  <div id="details">
+    <p>First Name: <span id="firstName">-</span></p>
+    <p>Last Name: <span id="lastName">-</span></p>
+    <p>Address: <span id="address">-</span></p>
+    <p>Date of Birth: <span id="dob">-</span></p>
+    <p>Contact Number: <span id="phone">-</span></p>
+  </div>
+
+  <button id="fillBtn">Autofill Form</button>
+  <p id="result"></p>
+
+  <script src="popup.js"></script>
+</body>
+</html>
