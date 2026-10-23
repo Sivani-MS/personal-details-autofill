@@ -2,11 +2,25 @@
 {
   "manifest_version": 3,
   "name": "Google Sheets Autofill",
-  "version": "1.0",
-  "description": "Autofill personal details from Google Sheets.",
+  "version": "1.2",
+  "description": "Automatically detect forms and autofill personal details from Google Sheets.",
   "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": [
     "https://docs.google.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*",
+        "file:///*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
   ],
   "action": {
     "default_popup": "popup.html"
