@@ -2,7 +2,7 @@
 function fillField(field, value) {
   if (!value || field.disabled || field.readOnly) return false;
   if (field.type === "hidden" || field.value.trim() !== "") return false;
-  if (field.getClientRects().length === 0) return false;
+  if (field.getClientRects().length === 0) return false; //checks whether the field has a visible layout on the webpage.
 
   field.value = value;
   field.dispatchEvent(new Event("input", { bubbles: true }));

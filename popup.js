@@ -1,11 +1,15 @@
 
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfWMw-TwRoJSZFuDpWhREh2gO8P0zbXxbbD-FQONLisg7p3tS79OdhL_urTYWjqJrOZy-pQJeDYsMr/pub?gid=0&single=true&output=csv";
+
 const refreshBtn = document.getElementById("refreshBtn");
 const profileSelect = document.getElementById("profileSelect");
 const status = document.getElementById("status");
+const fillBtn = document.getElementById("fillBtn");
+const result = document.getElementById("result");
 
 let profiles = [];
 
+// Convert CSV text into rows and columns
 function parseCSV(text) {
   const rows = [];
   let row = [];
@@ -40,13 +44,14 @@ function parseCSV(text) {
   return rows;
 }
 
+// Load profiles from Google Sheets
 async function loadProfiles() {
   status.textContent = "Loading profiles...";
   refreshBtn.disabled = true;
 
   try {
     const response = await fetch(SHEET_URL);
-    if (!response.ok) throw new Error("Could not access the Google Sheet.");
+    if (!response.ok) throw new Error("Could not access Google Sheets.");
 
     const rows = parseCSV(await response.text());
     if (rows.length < 2) throw new Error("No profiles found in the Sheet.");
@@ -55,11 +60,11 @@ async function loadProfiles() {
     const required = ["first name", "last name", "address", "date of birth", "contact number"];
 
     if (!required.every(header => headers.includes(header))) {
-      throw new Error("Check that the Sheet has all five required column headers.");
+      throw new Error("Check the Sheet column names.");
     }
 
     profiles = rows.slice(1).map(row => {
-      const get = header => row[headers.indexOf(header)] || "";
+      const get = name => row[headers.indexOf(name)] || "";
       return {
         firstName: get("first name"),
         lastName: get("last name"),
@@ -89,24 +94,8 @@ async function loadProfiles() {
     refreshBtn.disabled = false;
   }
 }
-function searchProfiles() {
-  const search = searchInput.value.toLowerCase();
-  const filtered = profiles.filter(person =>
-    `${person.firstName} ${person.lastName}`.toLowerCase().includes(search)
-  );
 
-  profileSelect.innerHTML = '<option value="">Select a person</option>';
-
-  filtered.forEach(person => {
-    const index = profiles.indexOf(person);
-    const option = document.createElement("option");
-    option.value = index;
-    option.textContent = `${person.firstName} ${person.lastName}`.trim();
-    profileSelect.appendChild(option);
-  });
-
-  showDetails();
-}
+// Display the selected person's details
 function showDetails() {
   const person = profiles[Number(profileSelect.value)];
 
@@ -117,13 +106,11 @@ function showDetails() {
   document.getElementById("phone").textContent = person?.phone || "-";
 }
 
+// Connect the Refresh button and dropdown
 refreshBtn.addEventListener("click", loadProfiles);
 profileSelect.addEventListener("change", showDetails);
 
-
-const fillBtn = document.getElementById("fillBtn");
-const result = document.getElementById("result");
-
+// Autofill the active webpage
 fillBtn.addEventListener("click", async () => {
   const person = profiles[Number(profileSelect.value)];
 
@@ -137,9 +124,9 @@ fillBtn.addEventListener("click", async () => {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-   if (!tab?.id || (!tab.url?.startsWith("http") && !tab.url?.startsWith("file:"))) {
-  throw new Error("Open a webpage with a form first.");
-}
+    if (!tab?.id || (!tab.url?.startsWith("http") && !tab.url?.startsWith("file:"))) {
+      throw new Error("Open a webpage with a form first.");
+    }
 
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
@@ -158,4 +145,3 @@ fillBtn.addEventListener("click", async () => {
     result.textContent = `Error: ${error.message}`;
   }
 });
-
